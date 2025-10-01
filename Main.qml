@@ -317,13 +317,13 @@ ApplicationWindow {
                 Text {
                     id: etaLabel
                     text: "ETA"
-                    font.pixelSize: 26
+                    font.pixelSize: 40
                     color: "white"
                     font.bold: true
                 }
                 Text {
                     text: (mqtt && mqtt.eta) ? mqtt.eta : ""
-                    font.pixelSize: 20
+                    font.pixelSize: 36
                     color: "lightgreen"
                 }
             }
