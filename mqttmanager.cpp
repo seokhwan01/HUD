@@ -9,7 +9,9 @@ MqttManager::MqttManager(QObject *parent) : QObject(parent) {
     m_client = new QMqttClient(this);
 
     // MQTT 브로커 주소와 포트 설정
-    m_client->setHostname(QStringLiteral("10.210.98.208"));
+    m_client->setHostname("10.210.98.208");
+    m_client->setPort(1883);
+    m_client->setTransport(QMqttClient::AbstractSocket, QMqttClient::IPv4Protocol);
     m_client->setPort(1883);
 
     // 🔔 에러 발생 시 로그 출력
