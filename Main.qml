@@ -150,7 +150,7 @@ ApplicationWindow {
         Image {
             id: car
             //source: "file:///C:/Users/seokhwan/Desktop/HUD/assets/Car.svg"
-            source : "file:///home/rb502/HUD/assets/Car.svg"
+            source : "file:///home/rbhud/HUD/assets/Car.svg"
 	    z: 20
             width: 100
             height: carIconHeight
@@ -330,7 +330,7 @@ ApplicationWindow {
 
             Image {
                 //source: "file:///C:/Users/seokhwan/Desktop/HUD/assets/siren.png"
-                source: "file:///home/rb502/HUD/assets/siren.png"
+                source: "file:///home/rbhud/HUD/assets/siren.png"
 		width: 48
                 height: 48
                 anchors.verticalCenter: etaLabel.verticalCenter
