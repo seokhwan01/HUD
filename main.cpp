@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("mqtt", &mqtt);
 
     // ✅ QML 파일 (절대경로 그대로 사용)
-    const QUrl url = QUrl::fromLocalFile("/home/rb502/HUD/Main.qml");
+    const QUrl url = QUrl::fromLocalFile("/home/rbhud/HUD/Main.qml");
     // const QUrl url("qrc:/HUD_EX/Main.qml");
 
     QObject::connect(
