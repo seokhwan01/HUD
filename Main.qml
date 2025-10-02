@@ -30,9 +30,10 @@ ApplicationWindow {
 
         // 도로 기준 간격: roadArea.width / lLanes
         // (totalLanes는 mqtt.totalLanes를 직접 참조)
-        property real laneSpacing: (mqtt
-                                    && mqtt.lanes > 0) ? width / mqtt.lanes : width / 3
-        // model: (mqtt && mqtt.lanes) ? mqtt.lanes + 1 : 4
+        property real laneSpacing: (mqtt && mqtt.totalLanes > 0)
+                                   ? width / mqtt.totalLanes
+                                   : width / 3
+
 
         // -------------------------------
         // 차선 라인 (왼쪽 실선, 중간 점선들, 오른쪽 실선)
@@ -49,8 +50,10 @@ ApplicationWindow {
                 y: 0
 
                 // x 계산: 마지막(오른쪽 경계)은 roadArea.width - lineWidth 해서 화면 밖으로 나가지 않게 보정
-                x: (index === (mqtt.totalLanes)) ? (roadArea.width - lw) : Math.round(
-                                                       index * roadArea.laneSpacing)
+                x: (mqtt && mqtt.totalLanes > 0 && index === mqtt.totalLanes)
+                      ? (roadArea.width - lw)
+                      : Math.round(index * roadArea.laneSpacing)
+
 
                 // 실선 (왼쪽 또는 오른쪽)
                 Rectangle {
@@ -61,7 +64,7 @@ ApplicationWindow {
 
                 // 중간은 점선(시각화용)
                 Repeater {
-                    model: (index > 0 && index < mqtt.totalLanes) ? 10 : 0
+                    model: (mqtt && mqtt.totalLanes > 0 && index > 0 && index < mqtt.totalLanes) ? 10 : 0
                     Rectangle {
                         width: lineSlot.lw
                         height: 30
@@ -91,7 +94,7 @@ ApplicationWindow {
 
                 if (!mqtt || mqtt.state !== "samePath")
                     return
-                if (!mqtt.ambulanceLane)
+                if (!mqtt || mqtt.totalLanes <= 0 || !mqtt.ambulanceLane)
                     return
 
                 // 구급차 차선 기준
@@ -187,7 +190,7 @@ ApplicationWindow {
                 ctx.clearRect(0, 0, width, height)
 
                 if (!mqtt || mqtt.state !== "samePath") return
-                if (!mqtt.currentLane) return
+                if (!mqtt || mqtt.totalLanes <= 0 || !mqtt.currentLane) return
 
                 // ── 기본 좌표 계산 ─────────────────────────────────────────
                 var startX = (mqtt.currentLane - 0.5) * roadArea.laneSpacing
@@ -331,8 +334,8 @@ ApplicationWindow {
             Image {
                 //source: "file:///C:/Users/seokhwan/Desktop/HUD/assets/siren.png"
                 source: "file:///home/rbhud/HUD/assets/siren.png"
-		width: 48
-                height: 48
+                width: 72
+                height: 72
                 anchors.verticalCenter: etaLabel.verticalCenter
                 visible: mqtt && (mqtt.state === "samePath"
                                   || mqtt.state === "nearby")

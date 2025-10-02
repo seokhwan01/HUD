@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     // Qt GUI 애플리케이션 실행 환경 준비
     QGuiApplication app(argc, argv);
 
-    // QML 엔진 생성 (QML 파일 로딩 담당)
+    // QML 엔진 생성 (QML 파일 로딩 담당)   
     QQmlApplicationEngine engine;
 
     // 시작 로그
