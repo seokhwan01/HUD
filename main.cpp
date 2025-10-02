@@ -9,6 +9,8 @@ int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
+    // ✅ 시작 로그
+    qDebug() << "🚀 HUD Application starting...";
 
     // ✅ MQTT 매니저 객체 생성
     MqttManager mqtt;

@@ -9,17 +9,23 @@ MqttManager::MqttManager(QObject *parent) : QObject(parent) {
     m_client->setHostname("10.210.98.208");
     m_client->setPort(1883);
 
-    // 연결되면 구독 시작
+    connect(m_client, &QMqttClient::errorChanged, this,
+        [this](QMqttClient::ClientError error) {
+            qWarning() << "[MQTT Error]" << error << m_client->errorString();
+        });
+
+    // 상태 로그
     connect(m_client, &QMqttClient::stateChanged, this,
-            [this](QMqttClient::ClientState state) {
-                if (state == QMqttClient::Connected) {
-                    auto sub = m_client->subscribe(QMqttTopicFilter("car/hud"));
-                    if (!sub)
-                        qWarning() << "[MQTT] Subscribe failed!";
-                    else
-                        qDebug() << "[MQTT] Subscribed to car/status";
-                }
-            });
+        [this](QMqttClient::ClientState state) {
+            qDebug() << "[MQTT State]" << state;
+            if (state == QMqttClient::Connected) {
+                auto sub = m_client->subscribe(QMqttTopicFilter("car/hud"));
+                if (!sub)
+                    qWarning() << "[MQTT] Subscribe failed!";
+                else
+                    qDebug() << "[MQTT] Subscribed to car/hud";
+            }
+        });
 
     // 메시지 수신 처리 (Qt6은 QMqttTopicName 사용)
     connect(m_client, &QMqttClient::messageReceived,
