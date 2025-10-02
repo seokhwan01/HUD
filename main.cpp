@@ -22,8 +22,8 @@ int main(int argc, char *argv[])
     // ?? MQTT 매니저 객체 생성
     MqttManager mqtt;
 
-    // 브로커 연결 시도
-    mqtt.connectToBroker();
+    // 이벤트 루프 시작 직후 브로커 연결 시도
+    QTimer::singleShot(0, &mqtt, &MqttManager::connectToBroker);
 
     // QML 쪽에서 "mqtt"라는 이름으로 C++ 객체 접근 가능하게 등록
     // → QML에서 mqtt.eta, mqtt.state 등으로 바로 접근 가능

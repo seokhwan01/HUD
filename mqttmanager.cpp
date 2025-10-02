@@ -44,8 +44,10 @@ MqttManager::MqttManager(QObject *parent) : QObject(parent) {
 
 // 🚗 브로커 연결 시도
 void MqttManager::connectToBroker() {
-    qDebug() << "[MQTT] Connecting to broker...";
-    m_client->connectToHost();   // 비동기 연결 → 성공/실패는 stateChanged, errorChanged로 확인
+    qDebug() << "[MQTT] Connecting to broker..."
+             << "host=" << m_client->hostname()
+             << "port=" << m_client->port();
+    m_client->connectToHost();
 }
 
 // 🚗 MQTT 메시지 수신 처리
