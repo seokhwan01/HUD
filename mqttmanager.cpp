@@ -6,14 +6,14 @@
 // 🚗 생성자
 MqttManager::MqttManager(QObject *parent) : QObject(parent) {
     m_client = new QMqttClient(this);
-    m_client->setHostname("192.168.137.211");
+    m_client->setHostname("10.210.98.208");
     m_client->setPort(1883);
 
     // 연결되면 구독 시작
     connect(m_client, &QMqttClient::stateChanged, this,
             [this](QMqttClient::ClientState state) {
                 if (state == QMqttClient::Connected) {
-                    auto sub = m_client->subscribe(QMqttTopicFilter("car/status"));
+                    auto sub = m_client->subscribe(QMqttTopicFilter("car/hud"));
                     if (!sub)
                         qWarning() << "[MQTT] Subscribe failed!";
                     else
