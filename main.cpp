@@ -7,6 +7,7 @@
 
 int main(int argc, char *argv[])
 {
+    QLoggingCategory::setFilterRules("*.debug=true");  // 모든 debug 로그 활성화
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
     // ✅ 시작 로그
