@@ -11,17 +11,16 @@ MqttManager::MqttManager(QObject *parent) : QObject(parent) {
     // MQTT 브로커 주소와 포트 설정
     m_client->setHostname("10.210.98.208");
     m_client->setPort(1883);
-    m_client->setTransport(QMqttClient::AbstractSocket, QMqttClient::IPv4Protocol);
     m_client->setPort(1883);
 
     // 🔔 에러 발생 시 로그 출력
     connect(m_client, &QMqttClient::errorChanged, this,
     [this](QMqttClient::ClientError error) {
         qWarning() << "[MQTT Error]" << error
-                   << m_client->errorString()
                    << "host=" << m_client->hostname()
                    << "port=" << m_client->port();
     });
+
 
     // 🔔 상태(state) 변경 시 처리 (Disconnected, Connecting, Connected 등)
     connect(m_client, &QMqttClient::stateChanged, this,

@@ -4,6 +4,7 @@
 #include <QUrl>
 #include <QTimer>
 #include "mqttmanager.h"   // ?? MQTT 매니저 클래스 포함
+#include <QLoggingCategory>
 
 int main(int argc, char *argv[])
 {
