@@ -320,13 +320,13 @@ ApplicationWindow {
                 Text {
                     id: etaLabel
                     text: "ETA"
-                    font.pixelSize: 40
+                    font.pixelSize: 70
                     color: "white"
                     font.bold: true
                 }
                 Text {
                     text: (mqtt && mqtt.eta) ? mqtt.eta : ""
-                    font.pixelSize: 36
+                    font.pixelSize: 70
                     color: "lightgreen"
                 }
             }
@@ -334,8 +334,8 @@ ApplicationWindow {
             Image {
                 //source: "file:///C:/Users/seokhwan/Desktop/HUD/assets/siren.png"
                 source: "file:///home/rbhud/HUD/assets/siren.png"
-                width: 72
-                height: 72
+                width: 150
+                height: 150
                 anchors.verticalCenter: etaLabel.verticalCenter
                 visible: mqtt && (mqtt.state === "samePath"
                                   || mqtt.state === "nearby")

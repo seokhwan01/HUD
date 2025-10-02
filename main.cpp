@@ -8,8 +8,13 @@
 
 int main(int argc, char *argv[])
 {
-    // ?? 디버그 로그 활성화 (모든 *.debug 카테고리)
-    QLoggingCategory::setFilterRules("*.debug=true");
+    // ? MQTT 로그만 활성화
+    QLoggingCategory::setFilterRules(
+        "qt.mqtt.debug=true\n"
+        "qt.mqtt.*=true\n"
+        "qt.scenegraph.*=false\n"
+        "qt.quick.*=false\n"
+    );
 
     // Qt GUI 애플리케이션 실행 환경 준비
     QGuiApplication app(argc, argv);
