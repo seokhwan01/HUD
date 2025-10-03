@@ -284,10 +284,8 @@ ApplicationWindow {
                         laneChangeArrow.progress += 0.02
                         laneChangeArrow.requestPaint()
                     } else {
-                        laneChangeArrow.progress = 1.0
-                        arrowTimer.stop()
+                        laneChangeArrow.progress = 0.0   // 다시 처음부터 시작
                         laneChangeArrow.requestPaint()
-                    }
                 }
             }
 
