@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QPointer>
+#include <QElapsedTimer>
 
 MqttManager::MqttManager(QObject *parent) : QObject(parent) {
     m_client = new QMqttClient(this);
@@ -80,7 +81,7 @@ void MqttManager::onMessageReceived(const QByteArray &message,
         qWarning() << "[MQTT] Ignored topic:" << topic.name();
         return;
     }
-    
+
     if (m_lastUpdate.isValid() && m_lastUpdate.elapsed() < 500) {
     return;
     }
