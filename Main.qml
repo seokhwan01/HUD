@@ -16,25 +16,26 @@ ApplicationWindow {
     function clamp(x,a,b)    { return (x < a) ? a : (x > b) ? b : x }
 
     // MQTT object가 아직 바인드 안되었을 수 있으므로 safe getters
-    function TL() {            // totalLanes
-        let t = mqtt ? toInt(mqtt.totalLanes, 3) : 3
-        return clamp(t, 1, 20) // 상한 20 임의 설정 (과도값 방지)
+   function tl() {            // totalLanes
+    let t = mqtt ? toInt(mqtt.totalLanes, 3) : 3
+    return clamp(t, 1, 20)
     }
-    function CL() {            // currentLane
+    function cl() {            // currentLane
         let c = mqtt ? toInt(mqtt.currentLane, 1) : 1
-        return clamp(c, 1, TL())
+        return clamp(c, 1, tl())
     }
-    function AL() {            // ambulanceLane
+    function al() {            // ambulanceLane
         let a = mqtt ? toInt(mqtt.ambulanceLane, 1) : 1
-        return clamp(a, 1, TL())
+        return clamp(a, 1, tl())
     }
-    function AD() {            // avoidDir (0: none, 1: right, 2: left)
-        let ad = mqtt ? toInt(mqtt.avoidDir, 0) : 0
-        return clamp(ad, 0, 2)
+    function ad() {            // avoidDir
+        let v = mqtt ? toInt(mqtt.avoidDir, 0) : 0
+        return clamp(v, 0, 2)
     }
-    function ST() {            // state
+    function st() {            // state
         return (mqtt && typeof mqtt.state === "string") ? mqtt.state : "idle"
     }
+
 
     // 전역 보정값
     property int outerMargin: 150
@@ -51,13 +52,13 @@ ApplicationWindow {
         anchors.rightMargin: outerMargin
 
         // 0/NaN/비정상 값 방지
-        property real laneSpacing: Math.max(1, width / TL())
+        property real laneSpacing: Math.max(1, width / tl())
 
         // ===== 차선 라인 =====
         Repeater {
             id: laneRepeater
             // 모델 음수/0 방지
-            model: TL() + 1
+            model: tl() + 1
             Item {
                 id: lineSlot
                 property int lw: Math.max(1, laneLineWidth)
@@ -66,18 +67,18 @@ ApplicationWindow {
                 y: 0
 
                 // 마지막 라인은 우측 경계로 보정
-                x: (index === TL()) ? Math.max(0, roadArea.width - lw)
+                x: (index === tl()) ? Math.max(0, roadArea.width - lw)
                                     : Math.round(index * roadArea.laneSpacing)
 
                 Rectangle {
                     anchors.fill: parent
                     color: "white"
-                    visible: (index === 0 || index === TL())
+                    visible: (index === 0 || index === tl())
                 }
 
                 Repeater {
                     // 중간 점선: 모델 안전화
-                    model: (index > 0 && index < TL()) ? 10 : 0
+                    model: (index > 0 && index < tl()) ? 10 : 0
                     Rectangle {
                         width: lineSlot.lw
                         height: 30
@@ -96,17 +97,17 @@ ApplicationWindow {
             anchors.fill: parent
             z: 5
             property real progress: 0.0
-            visible: (ST() === "samePath")
+            visible: (st() === "samePath")
 
             onPaint: {
                 const ctx = getContext && getContext("2d")
                 if (!ctx) return
                 ctx.clearRect(0, 0, width, height)
 
-                if (ST() !== "samePath") return
+                if (st() !== "samePath") return
 
-                const t = TL()
-                const a = AL()
+                const t = tl()
+                const a = al()
                 if (!isFinite(t) || t <= 0 || !isFinite(a)) return
 
                 const laneX = (a - 0.5) * roadArea.laneSpacing
@@ -163,7 +164,7 @@ ApplicationWindow {
             anchors.bottomMargin: 20
 
             // NaN 방지
-            x: clamp(((CL() - 0.5) * roadArea.laneSpacing) - width / 2, -width, roadArea.width)
+            x: clamp(((cl() - 0.5) * roadArea.laneSpacing) - width / 2, -width, roadArea.width)
 
             Behavior on x {
                 NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
@@ -181,18 +182,18 @@ ApplicationWindow {
             anchors.fill: parent
             z: 10
             property real progress: 0.0
-            visible: (ST() === "samePath")
+            visible: (st() === "samePath")
 
             onPaint: {
                 const ctx = getContext && getContext("2d")
                 if (!ctx) return
                 ctx.clearRect(0, 0, width, height)
 
-                if (ST() !== "samePath") return
+                if (st() !== "samePath") return
 
-                const t  = TL()
-                const c0 = CL()
-                const ad = AD()
+                const t  = tl()
+                const c0 = cl()
+                const ad = ad()
                 if (!isFinite(t) || t <= 0) return
 
                 let targetLane = c0
@@ -287,7 +288,7 @@ ApplicationWindow {
 
             Column {
                 spacing: 6
-                visible: (ST() === "samePath")
+                visible: (st() === "samePath")
                 Text {
                     id: etaLabel
                     text: "ETA"
@@ -308,7 +309,7 @@ ApplicationWindow {
                 width: 150
                 height: 150
                 anchors.verticalCenter: etaLabel.verticalCenter
-                visible: (ST() === "samePath" || ST() === "nearby")
+                visible: (st() === "samePath" || st() === "nearby")
                 onStatusChanged: if (status === Image.Error) console.warn("siren.png load failed:", source)
                 SequentialAnimation on opacity {
                     loops: Animation.Infinite
@@ -338,21 +339,21 @@ ApplicationWindow {
         }
 
         onAvoidDirChanged: {
-            if (ST() === "samePath") {
+            if (st() === "samePath") {
                 laneChangeArrow.startAnimation()
                 redLaneEffect.progress = 0.0
                 redLaneEffect.requestPaint()
             }
         }
         onCurrentLaneChanged: {
-            if (ST() === "samePath") {
+            if (st() === "samePath") {
                 laneChangeArrow.startAnimation()
                 redLaneEffect.progress = 0.0
                 redLaneEffect.requestPaint()
             }
         }
         onStateChanged: {
-            if (ST() === "samePath") {
+            if (st() === "samePath") {
                 laneChangeArrow.startAnimation()
                 redLaneEffect.progress = 0.0
                 redLaneEffect.requestPaint()
