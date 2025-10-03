@@ -7,6 +7,7 @@
 
 MqttManager::MqttManager(QObject *parent) : QObject(parent) {
     m_client = new QMqttClient(this);
+    m_lastUpdate.start();   // ✅ 타이머 시작
 
     // 안전한 기본 설정
     m_client->setHostname(QStringLiteral("10.210.98.208"));
@@ -41,9 +42,10 @@ MqttManager::MqttManager(QObject *parent) : QObject(parent) {
         }
     });
 
-    // 메시지 수신
+    // 메시지 수신 (QueuedConnection으로 안전하게)
     connect(m_client, &QMqttClient::messageReceived,
-            this, &MqttManager::onMessageReceived);
+            this, &MqttManager::onMessageReceived,
+            Qt::QueuedConnection);
 }
 
 MqttManager::~MqttManager() {
@@ -78,6 +80,11 @@ void MqttManager::onMessageReceived(const QByteArray &message,
         qWarning() << "[MQTT] Ignored topic:" << topic.name();
         return;
     }
+    
+    if (m_lastUpdate.isValid() && m_lastUpdate.elapsed() < 500) {
+    return;
+    }
+    m_lastUpdate.restart();
 
     // 크기 과도한 페이로드 방지(1MB 상한)
     if (message.size() > 1024 * 1024) {
