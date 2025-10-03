@@ -94,14 +94,21 @@ ApplicationWindow {
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.clearRect(0, 0, width, height)
-
+                
                 if (!mqtt || mqtt.state !== "samePath")
                     return
                 if (!mqtt || mqtt.totalLanes <= 0 || !mqtt.ambulanceLane)
                     return
-
+                
+                if (!mqtt || typeof mqtt.ambulanceLane !== "number" || mqtt.ambulanceLane <= 0)
+                    return
                 // 구급차 차선 기준
-                var laneX = (mqtt.ambulanceLane - 0.5) * roadArea.laneSpacing
+                var t = Number(mqtt.totalLanes)
+                var a = Number(mqtt.ambulanceLane)
+                // totalLanes / ambulanceLane 숫자 가드
+
+                a = Math.max(1, Math.min(t, Math.round(a)))
+                var laneX = (a - 0.5) * roadArea.laneSpacing
                 var fromY = height + 100
                 var toY = height - 580
 
@@ -139,7 +146,7 @@ ApplicationWindow {
 
             Timer {
                 interval: 50
-                running: true
+                running: redLaneEffect.visible
                 repeat: true
                 onTriggered: {
                     redLaneEffect.progress += 0.05
@@ -195,12 +202,25 @@ ApplicationWindow {
                 if (!mqtt || mqtt.state !== "samePath") return
                 if (!mqtt || mqtt.totalLanes <= 0 || !mqtt.currentLane) return
 
+                var t = Number(mqtt.totalLanes)
+                var c = Number(mqtt.currentLane)
+                var ad = Number(mqtt.avoidDir)
+                if (!isFinite(t) || t <= 0) return
+                if (!isFinite(c) || c <= 0) return
+
+                c = Math.max(1, Math.min(t, Math.round(c)))
+
+                var targetLane = c
+                if (ad === 1) targetLane = c + 1
+                else if (ad === 2) targetLane = c - 1
+                targetLane = Math.max(1, Math.min(t, Math.round(targetLane)))
+
                 // ── 기본 좌표 계산 ─────────────────────────────────────────
                 var startX = (mqtt.currentLane - 0.5) * roadArea.laneSpacing
                 var startY = height - (carIconHeight + 20)
 
                 // 목표 차선(좌/우 1칸)
-                var targetLane = mqtt.currentLane
+                //var targetLane = mqtt.currentLane
                 if (mqtt.avoidDir === 1) targetLane += 1   // 오른쪽
                 else if (mqtt.avoidDir === 2) targetLane -= 1   // 왼쪽
                 targetLane = Math.max(1, Math.min(mqtt.totalLanes, targetLane))
