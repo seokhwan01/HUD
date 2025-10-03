@@ -286,6 +286,7 @@ ApplicationWindow {
                     } else {
                         laneChangeArrow.progress = 0.0   // 다시 처음부터 시작
                         laneChangeArrow.requestPaint()
+                    }
                 }
             }
 
