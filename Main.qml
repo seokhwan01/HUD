@@ -15,6 +15,9 @@ ApplicationWindow {
     property int laneLineWidth: 3
     property int carIconHeight: 160
 
+    // ✅ MQTT에서 넘어오는 ETA를 직접 쓰지 않고, 안전 버퍼에 저장해서 UI가 참조
+    property string etaText: ""
+
     // ------------------------
     // roadArea: 실제 차선이 그려지는 영역 (양쪽 10px 여백)
     // 모든 차선 좌표는 이 영역 기준(width/lLanes)
@@ -323,8 +326,9 @@ ApplicationWindow {
                     color: "white"
                     font.bold: true
                 }
+                // ✅ 이제 mqtt.eta 직접참조 대신 etaText만 사용
                 Text {
-                    text: (mqtt && mqtt.eta) ? mqtt.eta : ""
+                    text: window.etaText
                     font.pixelSize: 70
                     font.family: "Noto Sans"    // 또는 "DejaVu Sans"
                     color: "lightgreen"
@@ -360,19 +364,41 @@ ApplicationWindow {
     // 자동으로 avoidDir 변경 시 laneChangeArrow.startAnimation() 호출
     // (mqtt 값이 바뀌면 차선 애니 실행)
     // -------------------------------
+    // ✅ MQTT 이벤트를 받아서 etaText를 안전하게 갱신
     Connections {
         target: mqtt
+
+        // ETA가 바뀔 때만 문자열로 안전 복사
+        onEtaChanged: {
+            if (mqtt && typeof mqtt.eta === "string") {
+                window.etaText = mqtt.eta
+            } else if (mqtt && (typeof mqtt.eta === "number")) {
+                // 숫자로 올 경우 포맷팅(분:초) – 선택 사항
+                var sec = Math.max(0, Math.floor(mqtt.eta))
+                var m = Math.floor(sec / 60)
+                var s = sec % 60
+                window.etaText = m + "m " + s + "s"
+            } else {
+                window.etaText = ""
+            }
+        }
+
         onAvoidDirChanged: if (mqtt.state === "samePath") {
-                               laneChangeArrow.startAnimation()
-                               redLaneEffect.progress = 0.0
-                           }
+            laneChangeArrow.startAnimation()
+            redLaneEffect.progress = 0.0
+        }
         onCurrentLaneChanged: if (mqtt.state === "samePath") {
-                                  laneChangeArrow.startAnimation()
-                                  redLaneEffect.progress = 0.0
-                              }
-        onStateChanged: if (mqtt.state === "samePath") {
-                            laneChangeArrow.startAnimation()
-                            redLaneEffect.progress = 0.0
-                        }
+            laneChangeArrow.startAnimation()
+            redLaneEffect.progress = 0.0
+        }
+        onStateChanged: {
+            if (mqtt.state === "samePath") {
+                laneChangeArrow.startAnimation()
+                redLaneEffect.progress = 0.0
+            } else {
+                // ✅ samePath가 아니면 ETA 숨김
+                window.etaText = ""
+            }
+        }
     }
 }
