@@ -11,11 +11,11 @@ int main(int argc, char *argv[])
     // ? MQTT 로그만 활성화
     QLoggingCategory::setFilterRules(
         "qt.mqtt.debug=true\n"
-        "qt.mqtt.*=true\n"
-        "qt.scenegraph.*=false\n"
-        "qt.quick.*=false\n"
+        "qt.mqtt.connection.verbose=true\n"
+        "qt.scenegraph.general=true\n"
+        "qt.scenegraph.renderloop=true\n"
+        "qt.quick.painting=true\n"
     );
-
     // Qt GUI 애플리케이션 실행 환경 준비
     QGuiApplication app(argc, argv);
 

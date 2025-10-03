@@ -28,7 +28,7 @@ ApplicationWindow {
         let a = mqtt ? toInt(mqtt.ambulanceLane, 1) : 1
         return clamp(a, 1, tl())
     }
-    function ad() {            // avoidDir
+    function ad() {            // avoidDir (0:none,1:right,2:left)
         let v = mqtt ? toInt(mqtt.avoidDir, 0) : 0
         return clamp(v, 0, 2)
     }
@@ -44,6 +44,17 @@ ApplicationWindow {
     // ✅ ETA는 문자열 버퍼만 UI가 참조
     property string etaText: ""
 
+    // ===== repaint 디바운스 (신호 폭주 방지) =====
+    Timer {
+        id: repaintDebounce
+        interval: 16      // ≈ 60fps 한 프레임
+        repeat: false
+        onTriggered: {
+            if (redLaneEffect.visible) redLaneEffect.requestPaint()
+            if (laneChangeArrow.visible) laneChangeArrow.requestPaint()
+        }
+    }
+
     Item {
         id: roadArea
         anchors.fill: parent
@@ -56,7 +67,6 @@ ApplicationWindow {
         // ===== 차선 라인 =====
         Repeater {
             id: laneRepeater
-            // 모델 음수/0 방지
             model: tl() + 1
             Item {
                 id: lineSlot
@@ -76,7 +86,7 @@ ApplicationWindow {
                 }
 
                 Repeater {
-                    // 중간 점선: 모델 안전화
+                    // 중간 점선
                     model: (index > 0 && index < tl()) ? 10 : 0
                     Rectangle {
                         width: lineSlot.lw
@@ -98,10 +108,19 @@ ApplicationWindow {
             property real progress: 0.0
             visible: (st() === "samePath")
 
+            // 안정화 옵션
+            renderTarget: Canvas.Image
+            renderStrategy: Canvas.Threaded
+            antialiasing: false
+            smooth: false
+
             onPaint: {
                 const ctx = getContext && getContext("2d")
                 if (!ctx) return
-                ctx.clearRect(0, 0, width, height)
+                if (width <= 0 || height <= 0) return
+                if (!isFinite(roadArea.laneSpacing) || roadArea.laneSpacing <= 0) return
+
+                try { ctx.clearRect(0, 0, width, height) } catch (e) { return }
 
                 if (st() !== "samePath") return
 
@@ -112,6 +131,7 @@ ApplicationWindow {
                 const laneX = (a - 0.5) * roadArea.laneSpacing
                 const fromY = height + 100
                 const toY   = height - 580
+                if (!isFinite(laneX) || !isFinite(fromY) || !isFinite(toY)) return
 
                 ctx.lineWidth = 15
                 ctx.strokeStyle = "#FF0000"
@@ -149,6 +169,7 @@ ApplicationWindow {
                     redLaneEffect.requestPaint()
                 }
             }
+            onVisibleChanged: if (!visible) { progress = 0.0 }
         }
 
         // ===== 차량 아이콘 =====
@@ -162,16 +183,12 @@ ApplicationWindow {
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 20
 
-            // NaN 방지
             x: clamp(((cl() - 0.5) * roadArea.laneSpacing) - width / 2, -width, roadArea.width)
 
             Behavior on x {
                 NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
             }
-
-            onStatusChanged: {
-                if (status === Image.Error) console.warn("Car.svg load failed:", source)
-            }
+            onStatusChanged: if (status === Image.Error) console.warn("Car.svg load failed:", source)
         }
 
         // ===== 회피 화살표 =====
@@ -182,26 +199,36 @@ ApplicationWindow {
             property real progress: 0.0
             visible: (st() === "samePath")
 
+            // 안정화 옵션
+            renderTarget: Canvas.Image
+            renderStrategy: Canvas.Threaded
+            antialiasing: false
+            smooth: false
+
             onPaint: {
                 const ctx = getContext && getContext("2d")
                 if (!ctx) return
-                ctx.clearRect(0, 0, width, height)
+                if (width <= 0 || height <= 0) return
+                if (!isFinite(roadArea.laneSpacing) || roadArea.laneSpacing <= 0) return
+
+                try { ctx.clearRect(0, 0, width, height) } catch (e) { return }
 
                 if (st() !== "samePath") return
 
                 const t  = tl()
                 const c0 = cl()
-                const avoidDir = ad()     // ⬅️ 함수와 변수 충돌 제거
+                const av = ad()    // ← 이름 충돌 방지
                 if (!isFinite(t) || t <= 0) return
 
                 let targetLane = c0
-                if (avoidDir === 1) targetLane++
-                else if (avoidDir === 2) targetLane--
+                if (av === 1) targetLane++
+                else if (av === 2) targetLane--
                 targetLane = clamp(targetLane, 1, t)
 
                 const startX = (c0 - 0.5) * roadArea.laneSpacing
                 const startY = height - (carIconHeight + 20)
                 const endX   = (targetLane - 0.5) * roadArea.laneSpacing
+                if (!isFinite(startX) || !isFinite(startY) || !isFinite(endX)) return
 
                 const up1    = 90
                 const diagDy = 90
@@ -213,8 +240,10 @@ ApplicationWindow {
                 const P3 = {x:endX,  y:P2.y - down3}
 
                 function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy) }
-                const L1 = dist(P0,P1), L2 = dist(P1,P2), L3 = dist(P2,P3), Ltot = Math.max(1, L1+L2+L3)
+                const L1 = dist(P0,P1), L2 = dist(P1,P2), L3 = dist(P2,P3)
+                const Ltot = Math.max(1, L1 + L2 + L3)
                 let drawLen = clamp(progress, 0, 1) * Ltot
+                if (!isFinite(drawLen) || Ltot <= 0) return
 
                 ctx.beginPath()
                 ctx.lineWidth = 22
@@ -227,8 +256,8 @@ ApplicationWindow {
                     const seg = dist(from,to)
                     if (remain >= seg) { ctx.lineTo(to.x,to.y); return remain - seg }
                     if (remain > 0) {
-                        const tseg = remain / seg
-                        ctx.lineTo(from.x + (to.x-from.x)*tseg, from.y + (to.y-from.y)*tseg)
+                        const tt = remain / seg
+                        ctx.lineTo(from.x + (to.x-from.x)*tt, from.y + (to.y-from.y)*tt)
                         return 0
                     }
                     return 0
@@ -240,7 +269,8 @@ ApplicationWindow {
                 r = lineToClamped(P2,P3,r)
                 ctx.stroke()
 
-                if (progress >= 1.0) {
+                // 진행이 끝에 충분히 근접하면 화살표 머리 표시
+                if (progress >= 0.999) {
                     const arrow = 35
                     ctx.beginPath()
                     ctx.fillStyle = "#39FF14"
@@ -258,16 +288,27 @@ ApplicationWindow {
                 running: false
                 repeat: true
                 onTriggered: {
-                    laneChangeArrow.progress += 0.02
-                    if (laneChangeArrow.progress >= 1.0) laneChangeArrow.progress = 0.0
-                    laneChangeArrow.requestPaint()
+                    // 1.0까지 채운 뒤 멈추고(머리 유지), 다음 이벤트에서 다시 startAnimation()
+                    if (laneChangeArrow.progress >= 1.0) {
+                        laneChangeArrow.progress = 1.0
+                        if (arrowTimer.running) arrowTimer.stop()
+                        laneChangeArrow.requestPaint()
+                    } else {
+                        laneChangeArrow.progress = Math.min(1.0, laneChangeArrow.progress + 0.02)
+                        laneChangeArrow.requestPaint()
+                    }
                 }
             }
 
             function startAnimation() {
+                // 새로 시작할 때만 리셋하고 타이머 시작
                 progress = 0.0
-                arrowTimer.start()
+                if (!arrowTimer.running) arrowTimer.start()
+                // 즉시 한 프레임 요청 (시작 지점 표시)
+                requestPaint()
             }
+
+            onVisibleChanged: if (!visible && arrowTimer.running) { arrowTimer.stop(); progress = 0.0 }
         }
     }
 
@@ -340,23 +381,27 @@ ApplicationWindow {
             if (st() === "samePath") {
                 laneChangeArrow.startAnimation()
                 redLaneEffect.progress = 0.0
-                redLaneEffect.requestPaint()
+                repaintDebounce.restart()
             }
         }
         onCurrentLaneChanged: {
             if (st() === "samePath") {
                 laneChangeArrow.startAnimation()
                 redLaneEffect.progress = 0.0
-                redLaneEffect.requestPaint()
+                repaintDebounce.restart()
             }
         }
         onStateChanged: {
             if (st() === "samePath") {
                 laneChangeArrow.startAnimation()
                 redLaneEffect.progress = 0.0
-                redLaneEffect.requestPaint()
+                repaintDebounce.restart()
             } else {
                 window.etaText = ""
+                // 상태 벗어나면 안전 정지
+                if (laneChangeArrow.arrowTimer && laneChangeArrow.arrowTimer.running)
+                    laneChangeArrow.arrowTimer.stop()
+                laneChangeArrow.progress = 0.0
             }
         }
     }
