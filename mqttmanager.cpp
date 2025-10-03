@@ -2,138 +2,190 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
+#include <QPointer>
 
-// 🚗 생성자
 MqttManager::MqttManager(QObject *parent) : QObject(parent) {
-    // MQTT 클라이언트 객체 생성 (this에 소속 → 자동 메모리 관리됨)
     m_client = new QMqttClient(this);
 
-    // MQTT 브로커 주소와 포트 설정
-    m_client->setHostname("10.210.98.208");
+    // 안전한 기본 설정
+    m_client->setHostname(QStringLiteral("10.210.98.208"));
     m_client->setPort(1883);
 
-
-    // 🔔 에러 발생 시 로그 출력
+    // 에러 로깅
     connect(m_client, &QMqttClient::errorChanged, this,
-    [this](QMqttClient::ClientError error) {
+            [this](QMqttClient::ClientError error) {
         qWarning() << "[MQTT Error]" << error
                    << "host=" << m_client->hostname()
                    << "port=" << m_client->port();
     });
 
-
-    // 🔔 상태(state) 변경 시 처리 (Disconnected, Connecting, Connected 등)
+    // 상태 변경
     connect(m_client, &QMqttClient::stateChanged, this,
-        [this](QMqttClient::ClientState state) {
-            qDebug() << "[MQTT State]" << state;
+            [this](QMqttClient::ClientState state) {
+        qDebug() << "[MQTT State]" << state;
+        if (!m_client) return;
 
-            // 브로커 연결 완료되면 car/hud 토픽 구독
-            if (state == QMqttClient::Connected) {
-                auto sub = m_client->subscribe(QMqttTopicFilter("car/hud"));
-                if (!sub)
+        if (state == QMqttClient::Connected) {
+            // 이미 구독돼 있으면 또 구독하지 않도록 주의
+            static bool subscribed = false;
+            if (!subscribed) {
+                auto sub = m_client->subscribe(QMqttTopicFilter(QStringLiteral("car/hud")));
+                if (!sub) {
                     qWarning() << "[MQTT] Subscribe failed!";
-                else
+                } else {
+                    subscribed = true;
                     qDebug() << "[MQTT] Subscribed to car/hud";
+                }
             }
-        });
+        }
+    });
 
-    // 🔔 MQTT 메시지 수신 시 onMessageReceived 슬롯 실행
-    // (Qt6은 두 번째 파라미터가 QMqttTopicName)
+    // 메시지 수신
     connect(m_client, &QMqttClient::messageReceived,
             this, &MqttManager::onMessageReceived);
 }
-//  * @brief 소멸자
-//  * 앱 종료 시 브로커와 연결 해제
-//  */
+
 MqttManager::~MqttManager() {
     if (m_client) {
+        // 안전한 정리: 먼저 구독 해제 시도(브로커가 죽어도 무시)
+        m_client->unsubscribe(QStringLiteral("car/hud"));
         m_client->disconnectFromHost();
+        // QObject parent가 delete 처리
     }
 }
 
-// 🚗 브로커 연결 시도
 void MqttManager::connectToBroker() {
+    if (!m_client) {
+        qWarning() << "[MQTT] Client is null";
+        return;
+    }
+    if (m_client->state() == QMqttClient::Connected ||
+        m_client->state() == QMqttClient::Connecting) {
+        qDebug() << "[MQTT] Already connected/connecting";
+        return;
+    }
     qDebug() << "[MQTT] Connecting to broker..."
              << "host=" << m_client->hostname()
              << "port=" << m_client->port();
     m_client->connectToHost();
 }
 
-// 🚗 MQTT 메시지 수신 처리
-// (JSON 형태의 payload를 파싱해서 멤버 변수 업데이트 후 시그널 발생)
 void MqttManager::onMessageReceived(const QByteArray &message,
                                     const QMqttTopicName &topic) {
-    qDebug() << "[MQTT Received]" << topic.name() << message;
+    // 토픽 필터(오동작 방지)
+    if (topic.name() != QLatin1String("car/hud")) {
+        qWarning() << "[MQTT] Ignored topic:" << topic.name();
+        return;
+    }
 
-    // JSON 파싱
+    // 크기 과도한 페이로드 방지(1MB 상한)
+    if (message.size() > 1024 * 1024) {
+        qWarning() << "[MQTT] Oversized payload:" << message.size();
+        return;
+    }
+
     QJsonParseError parseError;
-    QJsonDocument doc = QJsonDocument::fromJson(message, &parseError);
-
+    const QJsonDocument doc = QJsonDocument::fromJson(message, &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
         qWarning() << "[MQTT Parse Error]" << parseError.errorString();
         return;
     }
 
-    QJsonObject obj = doc.object();
+    const QJsonObject obj = doc.object();
 
-    // ETA (문자열 or 숫자 모두 대응)
+    // lanes
+    if (obj.contains("lanes")) {
+        const QJsonValue v = obj.value("lanes");
+        if (v.isDouble()) {
+            int nl = clampInt(v.toInt(3), kMinLanes, kMaxLanes);
+            if (m_totalLanes != nl) {
+                m_totalLanes = nl;
+                emit totalLanesChanged();
+                // totalLanes 바뀌면 current/ambulanceLane도 범위 재조정
+                int clampedCL = clampInt(m_currentLane, 1, m_totalLanes);
+                if (clampedCL != m_currentLane) {
+                    m_currentLane = clampedCL;
+                    emit currentLaneChanged();
+                }
+                int clampedAL = clampInt(m_ambulanceLane, 1, m_totalLanes);
+                if (clampedAL != m_ambulanceLane) {
+                    m_ambulanceLane = clampedAL;
+                    emit ambulanceLaneChanged();
+                }
+            }
+        }
+    }
+
+    // currentLane
+    if (obj.contains("currentLane")) {
+        const QJsonValue v = obj.value("currentLane");
+        if (v.isDouble()) {
+            int nl = clampInt(v.toInt(m_currentLane), 1, m_totalLanes);
+            if (m_currentLane != nl) {
+                m_currentLane = nl;
+                emit currentLaneChanged();
+            }
+        }
+    }
+
+    // avoidDir (0/1/2 외 값 방지)
+    if (obj.contains("avoidDir")) {
+        const QJsonValue v = obj.value("avoidDir");
+        if (v.isDouble()) {
+            int na = clampInt(v.toInt(m_avoidDir), 0, 2);
+            if (m_avoidDir != na) {
+                m_avoidDir = na;
+                emit avoidDirChanged();
+            }
+        }
+    }
+
+    // ambulanceLane
+    if (obj.contains("ambulanceLane")) {
+        const QJsonValue v = obj.value("ambulanceLane");
+        if (v.isDouble()) {
+            int na = clampInt(v.toInt(m_ambulanceLane), 1, m_totalLanes);
+            if (m_ambulanceLane != na) {
+                m_ambulanceLane = na;
+                emit ambulanceLaneChanged();
+            }
+        }
+    }
+
+    // state (문자열만 허용)
+    if (obj.contains("state")) {
+        const QJsonValue v = obj.value("state");
+        if (v.isString()) {
+            const QString ns = v.toString();
+            // 허용 목록(선택): idle / samePath / nearby
+            if (ns == QLatin1String("idle") ||
+                ns == QLatin1String("samePath") ||
+                ns == QLatin1String("nearby")) {
+                if (m_state != ns) {
+                    m_state = ns;
+                    emit stateChanged();
+                }
+            } else {
+                qWarning() << "[MQTT] Unknown state:" << ns;
+            }
+        }
+    }
+
+    // ETA (string or number)
     if (obj.contains("eta")) {
-        QJsonValue v = obj.value("eta");
+        const QJsonValue v = obj.value("eta");
         QString newEta;
         if (v.isString()) {
             newEta = v.toString();
         } else if (v.isDouble()) {
-            int sec = int(v.toDouble());
-            newEta = QString("%1m %2s").arg(sec/60).arg(sec%60);
+            int sec = qMax(0, v.toInt(0));
+            newEta = QStringLiteral("%1m %2s").arg(sec/60).arg(sec%60);
         }
+
         if (m_eta != newEta) {
             m_eta = newEta;
             emit etaChanged();
-        }
-    }
-
-    // 총 차선 개수 업데이트
-    if (obj.contains("lanes")) {   // 🔹 Python에서 보내는 그대로 유지
-        int newLanes = obj["lanes"].toInt();
-        if (m_totalLanes != newLanes) {
-            m_totalLanes = newLanes;
-            emit totalLanesChanged();
-        }
-    }
-
-    // 현재 차선 위치 업데이트
-    if (obj.contains("currentLane")) {
-        int newLane = obj["currentLane"].toInt();
-        if (m_currentLane != newLane) {
-            m_currentLane = newLane;
-            emit currentLaneChanged();
-        }
-    }
-
-    // 회피 방향(왼/오른쪽) 업데이트
-    if (obj.contains("avoidDir")) {
-        int newAvoid = obj["avoidDir"].toInt();
-        if (m_avoidDir != newAvoid) {
-            m_avoidDir = newAvoid;
-            emit avoidDirChanged();
-        }
-    }
-
-    // 구급차 위치 차선 업데이트
-    if (obj.contains("ambulanceLane")) {
-        int newAmb = obj["ambulanceLane"].toInt();
-        if (m_ambulanceLane != newAmb) {
-            m_ambulanceLane = newAmb;
-            emit ambulanceLaneChanged();
-        }
-    }
-
-    // 현재 상태(state: idle, samePath, nearby 등) 업데이트
-    if (obj.contains("state")) {
-        QString newState = obj["state"].toString();
-        if (m_state != newState) {
-            m_state = newState;
-            emit stateChanged();
         }
     }
 }
