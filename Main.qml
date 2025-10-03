@@ -7,6 +7,7 @@ ApplicationWindow {
     width: 800
     height: 480
     visible: true
+    visibility: "FullScreen"   // ✅ 전체화면 실행
     color: "black"
     title: qsTr("HUD with Dynamic Lanes & Animated Arrow + Center Red Lane Effect")
 
