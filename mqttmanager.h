@@ -6,6 +6,7 @@
 #include <QtMqtt/QMqttTopicFilter>
 #include <QtMqtt/QMqttSubscription>
 #include <QtMqtt/QMqttTopicName>
+#include <QElapsedTimer>
 
 class MqttManager : public QObject {
     Q_OBJECT
@@ -63,7 +64,7 @@ private:
     // 상한선들(비정상 payload 방지)
     static constexpr int kMaxLanes = 20;
     static constexpr int kMinLanes = 1;
-    
+
 private:
     QElapsedTimer m_lastUpdate;   // ✅ 마지막 업데이트 시각 기록
 };
