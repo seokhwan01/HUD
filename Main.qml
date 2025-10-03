@@ -326,6 +326,7 @@ ApplicationWindow {
                 Text {
                     text: (mqtt && mqtt.eta) ? mqtt.eta : ""
                     font.pixelSize: 70
+                    font.family: "Noto Sans"    // 또는 "DejaVu Sans"
                     color: "lightgreen"
                 }
             }
