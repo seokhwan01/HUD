@@ -16,9 +16,9 @@ ApplicationWindow {
     function clamp(x,a,b)    { return (x < a) ? a : (x > b) ? b : x }
 
     // MQTT object가 아직 바인드 안되었을 수 있으므로 safe getters
-   function tl() {            // totalLanes
-    let t = mqtt ? toInt(mqtt.totalLanes, 3) : 3
-    return clamp(t, 1, 20)
+    function tl() {            // totalLanes
+        let t = mqtt ? toInt(mqtt.totalLanes, 3) : 3
+        return clamp(t, 1, 20)
     }
     function cl() {            // currentLane
         let c = mqtt ? toInt(mqtt.currentLane, 1) : 1
@@ -35,7 +35,6 @@ ApplicationWindow {
     function st() {            // state
         return (mqtt && typeof mqtt.state === "string") ? mqtt.state : "idle"
     }
-
 
     // 전역 보정값
     property int outerMargin: 150
@@ -171,7 +170,6 @@ ApplicationWindow {
             }
 
             onStatusChanged: {
-                // 리소스 로드 실패 시 로그 (크래시 방지는 아니지만 디버그 도움)
                 if (status === Image.Error) console.warn("Car.svg load failed:", source)
             }
         }
@@ -193,12 +191,12 @@ ApplicationWindow {
 
                 const t  = tl()
                 const c0 = cl()
-                const ad = ad()
+                const avoidDir = ad()     // ⬅️ 함수와 변수 충돌 제거
                 if (!isFinite(t) || t <= 0) return
 
                 let targetLane = c0
-                if (ad === 1) targetLane++
-                else if (ad === 2) targetLane--
+                if (avoidDir === 1) targetLane++
+                else if (avoidDir === 2) targetLane--
                 targetLane = clamp(targetLane, 1, t)
 
                 const startX = (c0 - 0.5) * roadArea.laneSpacing
@@ -229,8 +227,8 @@ ApplicationWindow {
                     const seg = dist(from,to)
                     if (remain >= seg) { ctx.lineTo(to.x,to.y); return remain - seg }
                     if (remain > 0) {
-                        const t = remain / seg
-                        ctx.lineTo(from.x + (to.x-from.x)*t, from.y + (to.y-from.y)*t)
+                        const tseg = remain / seg
+                        ctx.lineTo(from.x + (to.x-from.x)*tseg, from.y + (to.y-from.y)*tseg)
                         return 0
                     }
                     return 0
