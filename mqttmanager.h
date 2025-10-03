@@ -24,6 +24,7 @@ class MqttManager : public QObject {
 
 public:
     explicit MqttManager(QObject *parent = nullptr);
+    ~MqttManager();  // ✅ 소멸자 추가
 
     // 🔹 QML에서 읽을 수 있는 getter 함수들
     QString eta() const { return m_eta; }
@@ -54,7 +55,7 @@ private slots:
 
 private:
     // 내부 멤버 변수들
-    QMqttClient *m_client;   // MQTT 클라이언트 객체
+    QMqttClient *m_client = nullptr;  // ✅ 반드시 nullptr 초기화
     QString m_eta;           // ETA 문자열
     int m_totalLanes = 3;    // 전체 차선 개수 (기본값 3)
     int m_currentLane = 2;   // 현재 차량 차선 (기본값 2, 중앙)

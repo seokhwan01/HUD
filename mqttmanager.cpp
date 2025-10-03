@@ -11,7 +11,7 @@ MqttManager::MqttManager(QObject *parent) : QObject(parent) {
     // MQTT 브로커 주소와 포트 설정
     m_client->setHostname("10.210.98.208");
     m_client->setPort(1883);
-    m_client->setPort(1883);
+
 
     // 🔔 에러 발생 시 로그 출력
     connect(m_client, &QMqttClient::errorChanged, this,
@@ -42,6 +42,14 @@ MqttManager::MqttManager(QObject *parent) : QObject(parent) {
     connect(m_client, &QMqttClient::messageReceived,
             this, &MqttManager::onMessageReceived);
 }
+//  * @brief 소멸자
+//  * 앱 종료 시 브로커와 연결 해제
+//  */
+MqttManager::~MqttManager() {
+    if (m_client) {
+        m_client->disconnectFromHost();
+    }
+}
 
 // 🚗 브로커 연결 시도
 void MqttManager::connectToBroker() {
@@ -68,12 +76,19 @@ void MqttManager::onMessageReceived(const QByteArray &message,
 
     QJsonObject obj = doc.object();
 
-    // ETA 값 업데이트
+    // ETA (문자열 or 숫자 모두 대응)
     if (obj.contains("eta")) {
-        QString newEta = obj["eta"].toString();
+        QJsonValue v = obj.value("eta");
+        QString newEta;
+        if (v.isString()) {
+            newEta = v.toString();
+        } else if (v.isDouble()) {
+            int sec = int(v.toDouble());
+            newEta = QString("%1m %2s").arg(sec/60).arg(sec%60);
+        }
         if (m_eta != newEta) {
             m_eta = newEta;
-            emit etaChanged();   // QML에서 자동 반영
+            emit etaChanged();
         }
     }
 
